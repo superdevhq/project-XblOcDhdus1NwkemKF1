@@ -22,18 +22,37 @@ const Index = () => {
   const handleGenerateDiagram = async (prompt: string) => {
     setIsGenerating(true);
     try {
+      console.log("Generating diagram with prompt:", prompt);
+      
       const { data, error } = await supabase.functions.invoke('generate-mermaid', {
         body: { prompt }
       });
 
       if (error) {
-        throw new Error(error.message || "Error generating diagram");
+        console.error("Supabase function error:", error);
+        throw new Error(error.message || "Error invoking diagram generation");
+      }
+
+      if (!data) {
+        console.error("No data returned from function");
+        throw new Error("No response data received from the server");
       }
 
       if (data.error) {
-        throw new Error(data.error || "Error generating diagram");
+        console.error("Error in function response:", data.error);
+        throw new Error(
+          typeof data.error === 'string' 
+            ? data.error 
+            : data.error.message || "Error generating diagram"
+        );
       }
 
+      if (!data.code) {
+        console.error("No code in response:", data);
+        throw new Error("No diagram code received from the server");
+      }
+
+      console.log("Diagram generated successfully");
       setCode(data.code);
       toast({
         title: "Diagram Generated",
@@ -43,7 +62,9 @@ const Index = () => {
       console.error("Error generating diagram:", error);
       toast({
         title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate diagram. Please try again.",
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to generate diagram. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -51,7 +72,7 @@ const Index = () => {
     }
   };
 
-  // Let's also add a function to save diagrams to Supabase
+  // Function to save diagrams to Supabase
   const saveDiagram = async (title: string, description: string) => {
     try {
       const { data, error } = await supabase
