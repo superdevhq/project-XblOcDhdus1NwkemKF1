@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Info } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface MermaidEditorProps {
   code: string;
@@ -45,7 +45,7 @@ const MermaidEditor = ({
                 />
                 <Button 
                   onClick={handleGenerateClick} 
-                  disabled={!prompt.trim() || isGenerating || !hasApiKey}
+                  disabled={!prompt.trim() || isGenerating}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                 >
                   {isGenerating ? (
@@ -61,14 +61,6 @@ const MermaidEditor = ({
                   )}
                 </Button>
               </div>
-              {!hasApiKey && (
-                <div className="flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md text-sm text-amber-800 dark:text-amber-300">
-                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <p>
-                    Please add your OpenAI API key in settings to use the generation feature.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
           <div className="p-0">

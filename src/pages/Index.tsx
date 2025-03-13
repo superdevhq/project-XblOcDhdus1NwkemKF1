@@ -7,6 +7,7 @@ import MermaidEditor from "@/components/MermaidEditor";
 import MermaidPreview from "@/components/MermaidPreview";
 import SettingsDialog from "@/components/SettingsDialog";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [code, setCode] = useState<string>(`graph TD
@@ -14,62 +15,26 @@ const Index = () => {
     B -->|Yes| C[Great!]
     B -->|No| D[Debug]
     D --> B`);
-  const [openAIKey, setOpenAIKey] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Load OpenAI key from localStorage on component mount
-  useEffect(() => {
-    const savedKey = localStorage.getItem("openai-key");
-    if (savedKey) {
-      setOpenAIKey(savedKey);
-    }
-  }, []);
-
   const handleGenerateDiagram = async (prompt: string) => {
-    if (!openAIKey) {
-      toast({
-        title: "OpenAI API Key Required",
-        description: "Please add your OpenAI API key in settings first.",
-        variant: "destructive",
-      });
-      setIsSettingsOpen(true);
-      return;
-    }
-
     setIsGenerating(true);
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openAIKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful assistant that generates Mermaid diagram code based on user prompts. Only respond with valid Mermaid syntax without any explanations or markdown formatting."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: 0.7,
-        }),
+      const { data, error } = await supabase.functions.invoke('generate-mermaid', {
+        body: { prompt }
       });
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error.message || "Error generating diagram");
+      if (error) {
+        throw new Error(error.message || "Error generating diagram");
       }
 
-      const mermaidCode = data.choices[0].message.content.trim();
-      setCode(mermaidCode);
+      if (data.error) {
+        throw new Error(data.error || "Error generating diagram");
+      }
+
+      setCode(data.code);
       toast({
         title: "Diagram Generated",
         description: "Your mermaid diagram has been created successfully.",
@@ -86,14 +51,38 @@ const Index = () => {
     }
   };
 
-  const saveOpenAIKey = (key: string) => {
-    setOpenAIKey(key);
-    localStorage.setItem("openai-key", key);
-    setIsSettingsOpen(false);
-    toast({
-      title: "Settings Saved",
-      description: "Your OpenAI API key has been saved.",
-    });
+  // Let's also add a function to save diagrams to Supabase
+  const saveDiagram = async (title: string, description: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('diagrams')
+        .insert([
+          { 
+            title, 
+            description, 
+            content: code,
+            is_public: false
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+
+      toast({
+        title: "Diagram Saved",
+        description: "Your diagram has been saved successfully.",
+      });
+
+      return data;
+    } catch (error) {
+      console.error("Error saving diagram:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save your diagram. Please try again.",
+        variant: "destructive",
+      });
+      return null;
+    }
   };
 
   return (
@@ -148,7 +137,7 @@ const Index = () => {
               onChange={setCode} 
               onGenerate={handleGenerateDiagram}
               isGenerating={isGenerating}
-              hasApiKey={!!openAIKey}
+              hasApiKey={true} // We're now using the edge function, so this is always true
             />
           </TabsContent>
 
@@ -165,8 +154,7 @@ const Index = () => {
       <SettingsDialog 
         open={isSettingsOpen} 
         onOpenChange={setIsSettingsOpen}
-        apiKey={openAIKey}
-        onSave={saveOpenAIKey}
+        onSave={() => setIsSettingsOpen(false)}
       />
     </div>
   );
